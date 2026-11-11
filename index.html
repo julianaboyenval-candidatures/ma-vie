@@ -259,12 +259,23 @@ const FREQS = [
   { d: 1, l: "Chaque jour" }, { d: 2, l: "Tous les 2 jours" }, { d: 3, l: "2 fois par semaine" },
   { d: 7, l: "Chaque semaine" }, { d: 14, l: "Toutes les 2 semaines" }, { d: 30, l: "Chaque mois" }
 ];
+const REPEATS = [["", "Jamais"], ["d1", "Chaque jour"], ["w1", "Chaque semaine"], ["w2", "Toutes les 2 semaines"], ["m1", "Chaque mois"], ["y1", "Chaque année"]];
+const FAIRESUBS = ["taches", "menage", "valise"];
+const DESTS = [{ id: "parents", e: "🏡", l: "Chez mes parents", s: "parents" }, { id: "josselin", e: "💕", l: "Chez Josselin", s: "Josselin" }];
+const PACKCATS = [{ id: "vet", e: "👕", l: "Vêtements" }, { id: "toil", e: "🧴", l: "Toilette & soins" }, { id: "tech", e: "🔌", l: "Tech" }, { id: "divers", e: "🎒", l: "Divers" }];
+const PACK_GUESS = [
+  ["tech", "chargeur,ecouteur,cable,batterie,ordinateur,ordi,tablette,liseuse,casque,montre"],
+  ["toil", "brosse,dentifrice,deodorant,deo,creme,shampoing,shampooing,gel douche,maquillage,demaquillant,medicament,pilule,lentille,lunettes,parfum,serum,coton,peigne,elastique,soin,trousse"],
+  ["vet", "pyjama,culotte,sous-vetement,sous vetement,chaussette,tenue,pull,jean,pantalon,t-shirt,tshirt,robe,chaussure,basket,manteau,veste,legging,brassiere,maillot,soutien,jupe,gilet,echarpe,bonnet"]
+];
+const BASE_PACK = [["Chargeur de téléphone", "tech"], ["Écouteurs", "tech"], ["Brosse à dents", "toil"], ["Déodorant", "toil"], ["Crème / soins", "toil"], ["Médicaments", "toil"],
+  ["Pyjama", "vet"], ["Sous-vêtements", "vet"], ["Chaussettes", "vet"], ["Tenue de rechange", "vet"], ["Livre en cours", "divers"], ["Clés", "divers"]];
 const BASE_CHORES = [
   ["Vaisselle", 1], ["Sortir les poubelles", 3], ["Plans de travail cuisine", 3], ["Lessive", 7], ["Aspirateur", 7],
   ["Salle de bain", 7], ["Toilettes", 7], ["Arroser les plantes", 7], ["Changer les draps", 14], ["Serpillère", 14],
   ["Poussière", 14], ["Trier le frigo", 14]
 ];
-const COLS = ["days", "meals", "recipes", "groceries", "todos", "chores", "books", "sessions", "sport", "journal", "meta"];
+const COLS = ["days", "meals", "recipes", "groceries", "todos", "chores", "books", "sessions", "sport", "journal", "packing", "meta"];
 const BUDGET_URL = "https://julianaboyenval-candidatures.github.io/mon-budget/";
 const SUBTABS = [["lecture", "📖 Lecture"], ["sport", "💪 Sport"], ["journal", "✍️ Journal"]];
 const SPORTS = [
@@ -310,7 +321,7 @@ const PLUS = svgI('<path d="M12 5v14M5 12h14"/>', 3);
 
 /* ---------- État et enregistrement (même file d'attente que Mon Budget) ---------- */
 const state = Object.assign(Object.fromEntries(COLS.map(c => [c, {}])), lsGet("vie.data", {}));
-const ui = { tab: lsGet("vie.tab", "jour"), moi: lsGet("vie.moi", "lecture"), week: mondayOf(today()), sweek: mondayOf(today()), faire: "taches", newDue: "none" };
+const ui = { tab: lsGet("vie.tab", "jour"), moi: lsGet("vie.moi", "lecture"), week: mondayOf(today()), sweek: mondayOf(today()), faire: "taches", newDue: "none", packWhere: "both" };
 if (ui.tab === "lecture") { ui.tab = "moi"; ui.moi = "lecture"; }
 let db = null, mode = "loading", queue = lsGet("vie.q", []), flushing = false, stale = false;
 const confirmed = {};
@@ -500,6 +511,11 @@ function viewJour() {
   out += '<section><div class="sechead"><h2>Au menu</h2><button class="link" data-act="tab" data-id="repas">La semaine</button></div><div class="panel">' +
     ["midi", "soir"].map(s => '<button class="item" data-act="meal" data-date="' + d + '" data-slot="' + s + '"><span class="emo">' + (s === "midi" ? "☀️" : "🌙") + '</span><div class="t"><div class="d">' + (s === "midi" ? "Midi" : "Soir") + '</div><div class="n">' + (meal[s] ? esc(meal[s]) : '<span class="small">Rien de prévu, touche pour choisir</span>') + '</div></div></button>').join("") + '</div></section>';
 
+  const dow = P(d).getDay();
+  if ((dow === 5 || dow === 6) && list("packing").length) {
+    const pk = packState(), dst = DESTS.find(x => x.id === pk.dest) || DESTS[0];
+    out += '<section><div class="panel"><button class="item" data-act="tab" data-id="valise"><span class="emo">🧳</span><div class="t"><div class="n">Ta valise pour le week-end</div><div class="d">' + esc(dst.l + " · " + pk.done + " / " + pk.items.length + " dans le sac") + '</div></div></button></div></section>';
+  }
   /* Lecture */
   const b = readingBooks()[0];
   out += '<section><div class="sechead"><h2>Ma lecture</h2><button class="link" data-act="tab" data-id="lecture">Mes livres</button></div>' + (b ? bookCard(b) : '<div class="panel"><div class="empty">Quel livre lis-tu en ce moment ?<br><br><button class="btn sm" data-act="book-new">+ Ajouter un livre</button></div></div>') + '</section>';
@@ -558,8 +574,8 @@ const gItem = g => '<div class="item' + (g.done ? " faded" : "") + '">' + checkB
 
 /* À faire */
 function viewFaire() {
-  let out = '<div class="seg"><button data-act="faire-seg" data-id="taches" aria-pressed="' + (ui.faire === "taches") + '">Choses à faire</button><button data-act="faire-seg" data-id="menage" aria-pressed="' + (ui.faire === "menage") + '">Ménage</button></div>';
-  return out + (ui.faire === "taches" ? viewTaches() : viewMenage());
+  const out = '<div class="seg">' + [["taches", "Tâches"], ["menage", "Ménage"], ["valise", "🧳 À prendre"]].map(([k, l]) => '<button data-act="faire-seg" data-id="' + k + '" aria-pressed="' + (ui.faire === k) + '">' + l + '</button>').join("") + '</div>';
+  return out + (ui.faire === "menage" ? viewMenage() : ui.faire === "valise" ? viewValise() : viewTaches());
 }
 function dueFor(k) {
   const d = today();
@@ -594,6 +610,7 @@ function todoItem(t, d) {
   if (t.done) sub = "Fait " + relPast(diff(t.doneAt, d));
   else if (t.due && t.due < d) sub = "Prévu le " + dShort(t.due);
   else if (t.due && t.due > addDays(d, 1)) sub = cap(fmt(t.due, { weekday: "long", day: "numeric", month: "short" }));
+  if (t.repeat && !t.done) sub = [sub, "🔁 " + repLabel(t.repeat)].filter(Boolean).join(" · ");
   return '<div class="item' + (t.done ? " faded" : "") + '">' + checkBtn("todo-done", t.id, t.done, (t.done ? "Remettre à faire : " : "Marquer comme fait : ") + t.name) + '<button class="t" data-act="todo" data-id="' + esc(t.id) + '"><div class="n">' + esc(t.name) + '</div>' + (sub ? '<div class="d' + (!t.done && t.due && t.due < d ? " late" : "") + '">' + esc(sub) + '</div>' : '') + '</button></div>';
 }
 function viewMenage() {
@@ -776,6 +793,75 @@ function saveJournal(quiet) {
   else save("journal", dd, { text, good, prompt, updated: Date.now() }, quiet);
   if ($("jstat")) $("jstat").textContent = "Enregistré ✓";
 }
+function nextDue(base, rep) {
+  const n = +rep.slice(1) || 1, u = rep[0];
+  if (u === "d") return addDays(base, n);
+  if (u === "w") return addDays(base, 7 * n);
+  const d = P(base), day = d.getDate(), t = new Date(d.getFullYear(), d.getMonth() + (u === "y" ? 12 * n : n), 1, 12);
+  t.setDate(Math.min(day, new Date(t.getFullYear(), t.getMonth() + 1, 0).getDate()));
+  return iso(t);
+}
+const repLabel = r => (REPEATS.find(x => x[0] === r) || ["", ""])[1];
+
+/* À prendre : une liste commune, plus des affaires propres à chaque destination. */
+function packState() {
+  const cfg = state.meta.pack || {}, dest = cfg.dest || "parents", checked = cfg.checked || {};
+  const items = list("packing").filter(x => !x.where || x.where === "both" || x.where === dest);
+  return { cfg, dest, checked, items, done: items.filter(x => checked[x.id]).length };
+}
+function guessPackCat(name) {
+  const n = norm(name);
+  for (const [c, words] of PACK_GUESS) for (const w of words.split(",")) if (new RegExp("(^|[^a-z])" + w).test(n)) return c;
+  return "divers";
+}
+function viewValise() {
+  const pk = packState(), all = list("packing");
+  let out = '<div class="seg">' + DESTS.map(x => '<button data-act="pack-dest" data-id="' + x.id + '" aria-pressed="' + (pk.dest === x.id) + '">' + x.e + ' ' + x.l + '</button>').join("") + '</div>';
+  if (!all.length) return out + '<div class="panel"><div class="empty">Ta liste d\'affaires pour le week-end : ce que tu prends partout, et ce qui change entre chez tes parents et chez Josselin.<br><br><button class="btn sm" data-act="pack-base">Partir d\'une liste de base</button></div></div>' + packAdd();
+  const pct = pk.items.length ? Math.round(100 * pk.done / pk.items.length) : 0;
+  out += '<div class="prog"><div class="big">' + pk.done + ' <small>/ ' + pk.items.length + ' dans le sac</small></div><div class="bar"><i style="width:' + pct + '%"></i></div><div class="small">' + (pk.items.length && pk.done === pk.items.length ? "Tout est prêt, bon week-end 💗" : "Coche au fur et à mesure que tu ranges.") + '</div></div>';
+  out += packAdd();
+  PACKCATS.forEach(c => {
+    const g = pk.items.filter(x => (PACKCATS.some(k => k.id === x.cat) ? x.cat : "divers") === c.id).sort((a, b) => (a.ts || 0) - (b.ts || 0));
+    if (!g.length) return;
+    out += '<section><h2>' + c.e + ' ' + esc(c.l) + '</h2><div class="panel">' + g.map(x => {
+      const on = !!pk.checked[x.id], only = x.where && x.where !== "both" ? "Seulement chez " + (DESTS.find(dd => dd.id === x.where) || {}).s : "";
+      return '<div class="item' + (on ? " faded" : "") + '">' + checkBtn("pack-tick", x.id, on, (on ? "Retirer du sac : " : "Dans le sac : ") + x.name) + '<button class="t" data-act="pack-tick" data-id="' + esc(x.id) + '"><div class="n">' + esc(x.name) + '</div>' + (only ? '<div class="d">' + esc(only) + '</div>' : '') + '</button><button class="more" data-act="pack-edit" data-id="' + esc(x.id) + '" aria-label="Modifier ' + esc(x.name) + '">' + DOTS + '</button></div>';
+    }).join("") + '</div></section>';
+  });
+  const other = all.length - pk.items.length;
+  if (other) out += '<p class="small" style="text-align:center;margin:0">' + other + ' affaire' + (other > 1 ? "s" : "") + ' seulement pour l\'autre destination, masquée' + (other > 1 ? "s" : "") + '.</p>';
+  if (pk.done) out += '<section><button class="btn alt" data-act="pack-reset">Vider le sac (nouveau départ)</button></section>';
+  return out;
+}
+function packAdd() {
+  return '<section><div class="qadd"><input class="inp" id="pq" placeholder="Ajouter (ex : pyjama, chargeur)" enterkeyhint="done" autocomplete="off" data-enter="pack-add"><button class="go" data-act="pack-add" aria-label="Ajouter">' + PLUS + '</button></div>' +
+    '<div class="chips" style="margin-top:8px">' + [["both", "Les deux"], ["parents", "Parents seulement"], ["josselin", "Josselin seulement"]].map(([k, l]) => '<button class="chip" data-act="pack-where" data-id="' + k + '" aria-pressed="' + (ui.packWhere === k) + '">' + l + '</button>').join("") + '</div></section>';
+}
+function sheetPack(id) {
+  const x = state.packing[id]; if (!x) return;
+  openSheet("Modifier l'affaire",
+    '<label class="f">Affaire<input class="inp" id="pkn" value="' + esc(x.name) + '" autocomplete="off"></label>' +
+    '<div>' + lab("Catégorie") + '<div class="wrapchips" id="pkc">' + PACKCATS.map(c => '<button class="chip" data-act="pick" data-v="' + c.id + '" aria-pressed="' + ((x.cat || "divers") === c.id) + '">' + c.e + ' ' + esc(c.l) + '</button>').join("") + '</div></div>' +
+    '<div>' + lab("À prendre") + segOf("pkw", [["both", "Les deux"], ["parents", "🏡 Parents"], ["josselin", "💕 Josselin"]], x.where || "both") + '</div>' +
+    '<button class="btn" data-act="pack-save" data-id="' + esc(id) + '">Enregistrer</button>' + delBtn("pack-del", id, "Supprimer de la liste"));
+}
+function savePackCfg(patch) { const cfg = state.meta.pack || {}; save("meta", "pack", { dest: cfg.dest || "parents", checked: cfg.checked || {}, ...patch }); }
+const ACTS_PACK = {
+  "pack-dest"(b) { savePackCfg({ dest: b.dataset.id }); },
+  "pack-where"(b) { ui.packWhere = b.dataset.id; render(); },
+  "pack-add"() {
+    const el = $("pq"), v = el.value; el.value = "";
+    v.split(/[,;\n]/).map(x => x.trim()).filter(Boolean).forEach((name, i) => save("packing", uid("pk"), { name: cap(name), cat: guessPackCat(name), where: ui.packWhere, ts: Date.now() + i }, true));
+    render(); el.focus && $("pq") && $("pq").focus();
+  },
+  "pack-tick"(b) { const pk = packState(), ch = { ...pk.checked }; if (ch[b.dataset.id]) delete ch[b.dataset.id]; else ch[b.dataset.id] = true; savePackCfg({ checked: ch }); },
+  "pack-edit"(b) { sheetPack(b.dataset.id); },
+  "pack-save"(b) { const x = state.packing[b.dataset.id]; if (x) save("packing", b.dataset.id, { ...x, name: $("pkn").value.trim() || x.name, cat: picked("pkc") || x.cat, where: picked("pkw") || "both" }); closeSheet(); },
+  "pack-del"(b) { save("packing", b.dataset.id, null); closeSheet(); },
+  "pack-reset"() { const prev = packState().checked; savePackCfg({ checked: {} }); toast("Sac vidé, prêt pour le prochain départ", "Annuler", () => savePackCfg({ checked: prev })); },
+  "pack-base"() { BASE_PACK.forEach(([name, cat], i) => save("packing", uid("pk"), { name, cat, where: "both", ts: Date.now() + i }, true)); render(); toast("Liste ajoutée : marque ce qui change entre tes parents et Josselin avec ⋯"); }
+};
 const VIEWS = { jour: viewJour, repas: viewRepas, courses: viewCourses, faire: viewFaire, moi: viewMoi };
 const ACTS_EXTRA = {};
 Object.assign(ACTS_EXTRA, {
@@ -856,6 +942,8 @@ function sheetTodo(id) {
   openSheet("Modifier",
     '<label class="f">Chose à faire<input class="inp" id="tn" value="' + esc(t.name) + '" autocomplete="off"></label>' +
     '<label class="f">Pour quand ? (facultatif)<input class="inp" type="date" id="td" value="' + esc(t.due || "") + '"></label>' +
+    '<div>' + lab("Répéter") + '<div class="wrapchips" id="trp">' + REPEATS.map(([k, l]) => '<button class="chip" data-act="pick" data-v="' + k + '" aria-pressed="' + ((t.repeat || "") === k) + '">' + (k ? "🔁 " : "") + l + '</button>').join("") + '</div></div>' +
+    '<div class="small">Une tâche répétée revient toute seule à la prochaine date quand tu la coches.</div>' +
     '<button class="btn" data-act="todo-save" data-id="' + esc(id) + '">Enregistrer</button>' + delBtn("todo-del", id, "Supprimer"));
 }
 function sheetChore(id) {
@@ -928,6 +1016,16 @@ function todoToggle(id) {
   const t = state.todos[id]; if (!t) return;
   if (t.done) { save("todos", id, { ...t, done: false, doneAt: null, doneTs: null }); return; }
   const prev = { ...t };
+  if (t.repeat) {
+    const d = today();
+    let next = nextDue(t.due || d, t.repeat), guard = 0;
+    while (next <= d && guard++ < 500) next = nextDue(next, t.repeat);
+    const nid = uid("t");
+    save("todos", id, { ...t, done: true, doneAt: d, doneTs: Date.now() }, true);
+    save("todos", nid, { name: t.name, due: next, repeat: t.repeat, done: false, doneAt: null, ts: Date.now() });
+    toast("Bien joué 💪 Prochaine fois : " + dShort(next), "Annuler", () => { save("todos", nid, null, true); save("todos", id, prev); });
+    return;
+  }
   save("todos", id, { ...t, done: true, doneAt: today(), doneTs: Date.now() });
   toast("Bien joué 💪", "Annuler", () => save("todos", id, prev));
 }
@@ -935,7 +1033,9 @@ function todoToggle(id) {
 const ACTS = {
   tab(b) {
     const id = b.dataset.id;
-    if (SUBTABS.some(x => x[0] === id)) { ui.tab = "moi"; ui.moi = id; lsSet("vie.moi", id); } else ui.tab = id;
+    if (SUBTABS.some(x => x[0] === id)) { ui.tab = "moi"; ui.moi = id; lsSet("vie.moi", id); }
+    else if (FAIRESUBS.includes(id)) { ui.tab = "faire"; ui.faire = id; }
+    else ui.tab = id;
     lsSet("vie.tab", ui.tab); render(); scrollTo(0, 0);
   },
   wk(b) { ui.week = addDays(ui.week, +b.dataset.n); render(); },
@@ -1013,7 +1113,11 @@ const ACTS = {
     el.focus();
   },
   todo(b) { sheetTodo(b.dataset.id); },
-  "todo-save"(b) { const t = state.todos[b.dataset.id]; if (t) save("todos", b.dataset.id, { ...t, name: $("tn").value.trim() || t.name, due: $("td").value || null }); closeSheet(); },
+  "todo-save"(b) {
+    const t = state.todos[b.dataset.id];
+    if (t) { const repeat = picked("trp") || null; save("todos", b.dataset.id, { ...t, name: $("tn").value.trim() || t.name, repeat, due: $("td").value || (repeat ? today() : null) }); }
+    closeSheet();
+  },
   "todo-del"(b) { save("todos", b.dataset.id, null); closeSheet(); },
   "chore-new"() { sheetChore(null); },
   chore(b) { sheetChore(b.dataset.id); },
@@ -1100,7 +1204,7 @@ const ACTS = {
     save("meta", "timer", null);
   }
 };
-Object.assign(ACTS, ACTS_EXTRA);
+Object.assign(ACTS, ACTS_EXTRA, ACTS_PACK);
 function rememberStaples(items, inc) {
   const cur = (state.meta.staples || {}).items || {}, next = { ...cur };
   items.forEach(g => { const k = norm(g.name); if (!k) return; const o = next[k] || { name: g.name, n: 0 }; next[k] = { name: o.name, rayon: g.rayon || o.rayon || "autre", n: (o.n || 0) + inc }; });
