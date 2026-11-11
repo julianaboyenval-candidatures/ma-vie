@@ -242,6 +242,10 @@ const RAYONS = [
   { id: "boul", e: "🥖", l: "Boulangerie" }, { id: "epic", e: "🥫", l: "Épicerie" }, { id: "surg", e: "🧊", l: "Surgelés" },
   { id: "boiss", e: "🧃", l: "Boissons" }, { id: "hyg", e: "🧴", l: "Hygiène & maison" }, { id: "autre", e: "🛒", l: "Autre" }
 ];
+/* Priorité des courses : « pas urgent » passe en moyen après 3 jours, « moyen » passe en urgent après 2 jours. */
+const PRIOS = [{ id: "urgent", e: "🔴", l: "Urgent" }, { id: "moyen", e: "🟠", l: "Moyen" }, { id: "pas", e: "🟢", l: "Pas urgent" }, { id: "unjour", e: "🛋️", l: "Un jour" }];
+const PRIO = Object.fromEntries(PRIOS.map(x => [x.id, x]));
+const PRIO_RANK = { urgent: 0, moyen: 1, pas: 2, unjour: 3 };
 const RAYON = Object.fromEntries(RAYONS.map(r => [r.id, r]));
 /* Devine le rayon d'un article (ordre important : les cas particuliers d'abord). */
 const GUESS = [
@@ -321,7 +325,7 @@ const PLUS = svgI('<path d="M12 5v14M5 12h14"/>', 3);
 
 /* ---------- État et enregistrement (même file d'attente que Mon Budget) ---------- */
 const state = Object.assign(Object.fromEntries(COLS.map(c => [c, {}])), lsGet("vie.data", {}));
-const ui = { tab: lsGet("vie.tab", "jour"), moi: lsGet("vie.moi", "lecture"), week: mondayOf(today()), sweek: mondayOf(today()), faire: "taches", newDue: "none", packWhere: "both" };
+const ui = { tab: lsGet("vie.tab", "jour"), moi: lsGet("vie.moi", "lecture"), week: mondayOf(today()), sweek: mondayOf(today()), faire: "taches", newDue: "none", packWhere: "both", gPrio: lsGet("vie.gprio", "moyen") };
 if (ui.tab === "lecture") { ui.tab = "moi"; ui.moi = "lecture"; }
 let db = null, mode = "loading", queue = lsGet("vie.q", []), flushing = false, stale = false;
 const confirmed = {};
@@ -404,14 +408,24 @@ function guessRayon(name) {
   }
   return "autre";
 }
-function addGroceries(names) {
+function gPrio(g) {
+  const p = g.prio || "moyen", since = diff(g.prioDate || iso(new Date(g.ts || Date.now())), today());
+  if (p === "pas") return since >= 5 ? { p: "urgent", up: true } : since >= 3 ? { p: "moyen", left: 5 - since, up: true } : { p: "pas", left: 3 - since };
+  if (p === "moyen") return since >= 2 ? { p: "urgent", up: true } : { p: "moyen", left: 2 - since };
+  return { p };
+}
+function groceryNeed() {
+  const open = list("groceries").filter(g => !g.done).map(g => ({ ...g, ep: gPrio(g) }));
+  return { open, urgent: open.filter(g => g.ep.p === "urgent"), soon: open.filter(g => g.ep.p === "moyen" && g.ep.left === 1) };
+}
+function addGroceries(names, prio) {
   const open = new Set(list("groceries").filter(g => !g.done).map(g => norm(g.name)));
   let n = 0;
   names.forEach(raw => {
     const name = cap(String(raw).trim());
     if (!name || open.has(norm(name))) return;
     open.add(norm(name));
-    save("groceries", uid("g"), { name, rayon: guessRayon(name), done: false, ts: Date.now() + n }, true);
+    save("groceries", uid("g"), { name, rayon: guessRayon(name), prio: prio || ui.gPrio, prioDate: today(), done: false, ts: Date.now() + n }, true);
     n++;
   });
   render();
@@ -511,6 +525,8 @@ function viewJour() {
   out += '<section><div class="sechead"><h2>Au menu</h2><button class="link" data-act="tab" data-id="repas">La semaine</button></div><div class="panel">' +
     ["midi", "soir"].map(s => '<button class="item" data-act="meal" data-date="' + d + '" data-slot="' + s + '"><span class="emo">' + (s === "midi" ? "☀️" : "🌙") + '</span><div class="t"><div class="d">' + (s === "midi" ? "Midi" : "Soir") + '</div><div class="n">' + (meal[s] ? esc(meal[s]) : '<span class="small">Rien de prévu, touche pour choisir</span>') + '</div></div></button>').join("") + '</div></section>';
 
+  const gn = groceryNeed();
+  if (gn.urgent.length) out += '<section><div class="panel"><button class="item" data-act="tab" data-id="courses"><span class="emo">🛒</span><div class="t"><div class="n">Courses à faire</div><div class="d late">' + esc(gn.urgent.length + " urgent" + (gn.urgent.length > 1 ? "s" : "") + " : " + gn.urgent.slice(0, 4).map(g => g.name).join(", ") + (gn.urgent.length > 4 ? "…" : "")) + '</div></div></button></div></section>';
   const dow = P(d).getDay();
   if ((dow === 5 || dow === 6) && list("packing").length) {
     const pk = packState(), dst = DESTS.find(x => x.id === pk.dest) || DESTS[0];
@@ -555,7 +571,12 @@ function weekIngredients() {
 /* Courses */
 function viewCourses() {
   const items = list("groceries"), open = items.filter(g => !g.done), done = items.filter(g => g.done);
-  let out = '<section><div class="qadd"><input class="inp" id="gq" placeholder="Ajouter (ex : lait, œufs, pain)" enterkeyhint="done" autocomplete="off" data-enter="g-add"><button class="go" data-act="g-add" aria-label="Ajouter">' + PLUS + '</button></div></section>';
+  const need = groceryNeed(), shop = open.filter(g => (g.prio || "moyen") !== "unjour"), oneDay = open.filter(g => g.prio === "unjour");
+  let out = '<div class="prog"><div class="big" style="font-size:24px">' + (need.urgent.length ? "🛒 Courses : oui" : "🌿 Pas besoin d'y aller") + '</div><div class="small" style="margin-top:4px">' +
+    esc(need.urgent.length ? need.urgent.length + " article" + (need.urgent.length > 1 ? "s" : "") + " urgent" + (need.urgent.length > 1 ? "s" : "") + " : " + need.urgent.slice(0, 5).map(g => g.name).join(", ") + (need.urgent.length > 5 ? "…" : "")
+      : "Rien d'urgent pour l'instant." + (need.soon.length ? " " + need.soon.length + " article" + (need.soon.length > 1 ? "s deviendront urgents" : " deviendra urgent") + " demain." : "")) + '</div></div>';
+  out += '<section><div class="qadd"><input class="inp" id="gq" placeholder="Ajouter (ex : lait, œufs, pain)" enterkeyhint="done" autocomplete="off" data-enter="g-add"><button class="go" data-act="g-add" aria-label="Ajouter">' + PLUS + '</button></div>' +
+    '<div class="chips" style="margin-top:8px">' + PRIOS.map(x => '<button class="chip" data-act="g-prio" data-id="' + x.id + '" aria-pressed="' + (ui.gPrio === x.id) + '">' + x.e + ' ' + x.l + '</button>').join("") + '</div></section>';
 
   const openNames = new Set(open.map(g => norm(g.name)));
   const freq = Object.values((state.meta.staples || {}).items || {}).filter(s => !openNames.has(norm(s.name))).sort((a, b) => b.n - a.n).slice(0, 14);
@@ -563,14 +584,20 @@ function viewCourses() {
 
   if (!open.length && !done.length) out += '<div class="panel"><div class="empty">Ta liste est vide 🌿<br>Ajoute des articles ici, ou depuis tes repas de la semaine.</div></div>';
   RAYONS.forEach(r => {
-    const g = open.filter(x => (RAYON[x.rayon] ? x.rayon : "autre") === r.id).sort((a, b) => a.ts - b.ts);
+    const g = shop.filter(x => (RAYON[x.rayon] ? x.rayon : "autre") === r.id).sort((a, b) => PRIO_RANK[gPrio(a).p] - PRIO_RANK[gPrio(b).p] || a.ts - b.ts);
     if (!g.length) return;
     out += '<section><h2>' + r.e + ' ' + esc(r.l) + ' · ' + g.length + '</h2><div class="panel">' + g.map(gItem).join("") + '</div></section>';
   });
+  if (oneDay.length) out += '<section><h2>🛋️ À acheter un jour · ' + oneDay.length + '</h2><div class="panel">' + oneDay.sort((a, b) => a.ts - b.ts).map(gItem).join("") + '</div></section>';
   if (done.length) out += '<section><div class="sechead"><h2>Dans le panier · ' + done.length + '</h2><button class="link" data-act="g-clear">Vider le panier</button></div><div class="panel">' + done.sort((a, b) => (b.doneTs || 0) - (a.doneTs || 0)).map(gItem).join("") + '</div></section>';
   return out;
 }
-const gItem = g => '<div class="item' + (g.done ? " faded" : "") + '">' + checkBtn("g-tick", g.id, g.done, (g.done ? "Retirer du panier : " : "Mettre dans le panier : ") + g.name) + '<button class="t" data-act="g-tick" data-id="' + esc(g.id) + '"><div class="n">' + esc(g.name) + '</div></button><button class="more" data-act="g-edit" data-id="' + esc(g.id) + '" aria-label="Modifier ' + esc(g.name) + '">' + DOTS + '</button></div>';
+function prioTxt(g) {
+  const ep = gPrio(g), x = PRIO[ep.p];
+  if (ep.p === "unjour") return "";
+  return x.e + " " + x.l + (ep.left ? " · " + (ep.p === "pas" ? "moyen" : "urgent") + (ep.left === 1 ? " demain" : " dans " + ep.left + " j") : "") + (ep.up && g.prio !== ep.p ? " (attend depuis un moment)" : "");
+}
+const gItem = g => '<div class="item' + (g.done ? " faded" : "") + '">' + checkBtn("g-tick", g.id, g.done, (g.done ? "Retirer du panier : " : "Mettre dans le panier : ") + g.name) + '<button class="t" data-act="g-tick" data-id="' + esc(g.id) + '"><div class="n">' + esc(g.name) + '</div>' + (!g.done && prioTxt(g) ? '<div class="d' + (gPrio(g).p === "urgent" ? " late" : "") + '">' + esc(prioTxt(g)) + '</div>' : '') + '</button><button class="more" data-act="g-edit" data-id="' + esc(g.id) + '" aria-label="Modifier ' + esc(g.name) + '">' + DOTS + '</button></div>';
 
 /* À faire */
 function viewFaire() {
@@ -934,6 +961,8 @@ function sheetGrocery(id) {
   const g = state.groceries[id]; if (!g) return;
   openSheet("Modifier l'article",
     '<label class="f">Article<input class="inp" id="gn" value="' + esc(g.name) + '" autocomplete="off"></label>' +
+    '<div>' + lab("Priorité") + '<div class="wrapchips" id="gp">' + PRIOS.map(x => '<button class="chip" data-act="pick" data-v="' + x.id + '" aria-pressed="' + ((g.prio || "moyen") === x.id) + '">' + x.e + ' ' + x.l + '</button>').join("") + '</div>' +
+    '<div class="small" style="margin-top:6px">« Pas urgent » devient moyen après 3 jours, « moyen » devient urgent après 2 jours. « Un jour » ne bouge pas (meuble, déco…).</div></div>' +
     '<div><div class="small" style="margin-bottom:6px;font-weight:700">Rayon</div><div class="wrapchips" id="gr">' + RAYONS.map(r => '<button class="chip" data-act="pick" data-v="' + r.id + '" aria-pressed="' + (g.rayon === r.id) + '">' + r.e + ' ' + esc(r.l) + '</button>').join("") + '</div></div>' +
     '<button class="btn" data-act="g-save" data-id="' + esc(id) + '">Enregistrer</button>' + delBtn("g-del", id, "Retirer de la liste"));
 }
@@ -1087,12 +1116,13 @@ const ACTS = {
     el.focus();
   },
   "g-quick"(b) { addGroceries([b.dataset.name]); },
+  "g-prio"(b) { ui.gPrio = b.dataset.id; lsSet("vie.gprio", ui.gPrio); render(); },
   "g-tick"(b) { const g = state.groceries[b.dataset.id]; if (g) save("groceries", b.dataset.id, { ...g, done: !g.done, doneTs: g.done ? null : Date.now() }); },
   "g-edit"(b) { sheetGrocery(b.dataset.id); },
   "g-save"(b) {
     const g = state.groceries[b.dataset.id]; if (!g) return closeSheet();
-    const name = $("gn").value.trim() || g.name, rayon = picked("gr") || g.rayon;
-    save("groceries", b.dataset.id, { ...g, name, rayon });
+    const name = $("gn").value.trim() || g.name, rayon = picked("gr") || g.rayon, prio = picked("gp") || g.prio || "moyen";
+    save("groceries", b.dataset.id, { ...g, name, rayon, prio, prioDate: prio !== (g.prio || "moyen") ? today() : (g.prioDate || today()) });
     if (rayon !== g.rayon) rememberStaples([{ name, rayon }], 0);
     closeSheet();
   },
