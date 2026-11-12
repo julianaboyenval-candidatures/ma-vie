@@ -49,6 +49,33 @@ img { max-width: 100%; }
 body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 16px; line-height: 1.4; }
 body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--bg); }
 button, input, select, textarea { font: inherit; color: inherit; }
+
+/* Espace pro TCA (Trois C Agency) : tout passe en vert pomme pâle. */
+:root[data-pro] { --bg: #f2f8e9; --surface: #ffffff; --ink: #263a1c; --muted: #5b6f4f; --line: #dcebc8; --soft: #e5f2d2; --accent: #4c8712; --on-accent: #ffffff; }
+@media (prefers-color-scheme: dark) { :root[data-pro]:not([data-theme="light"]) { --bg: #151c11; --surface: #1e2918; --ink: #eef7e6; --muted: #a8be98; --line: #33442a; --soft: #283a20; --accent: #9ad559; --on-accent: #16240b; } }
+:root[data-pro][data-theme="dark"] { --bg: #151c11; --surface: #1e2918; --ink: #eef7e6; --muted: #a8be98; --line: #33442a; --soft: #283a20; --accent: #9ad559; --on-accent: #16240b; }
+.probanner { display: flex; align-items: center; gap: 12px; background: var(--soft); border-radius: 20px; padding: 14px 16px; }
+.probanner .logo { width: 44px; height: 44px; border-radius: 14px; background: var(--accent); color: var(--on-accent); display: grid; place-items: center; font-weight: 900; font-size: 14px; letter-spacing: .5px; flex: none; }
+.probanner b { display: block; }
+.protask { border-bottom: 1px solid var(--line); }
+.panel > .protask:last-child { border-bottom: 0; }
+.protask > .item { border-bottom: 0; }
+.protask .pbar { height: 5px; border-radius: 3px; background: var(--soft); margin: -4px 0 10px 42px; overflow: hidden; }
+.protask .pbar i { display: block; height: 100%; background: var(--accent); border-radius: 3px; }
+.subs { margin: -2px 0 12px 42px; padding-left: 12px; border-left: 2px solid var(--soft); }
+.subitem { display: flex; align-items: center; gap: 10px; min-height: 40px; }
+.subitem .check { width: 24px; height: 24px; }
+.subitem .check svg { width: 14px; height: 14px; }
+.subitem .sn { flex: 1; min-width: 0; font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.subitem.faded .sn { text-decoration: line-through; color: var(--muted); }
+.subitem .x { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; color: var(--muted); flex: none; }
+.subitem .x svg { width: 14px; height: 14px; }
+.subadd { display: flex; gap: 8px; margin-top: 4px; }
+.subadd .inp { padding: 8px 10px; font-size: 15px; }
+.subadd .go { flex: none; width: 38px; border-radius: 10px; background: var(--soft); color: var(--accent); display: grid; place-items: center; }
+.subadd .go svg { width: 18px; height: 18px; }
+.pill.hot { background: var(--accent); color: var(--on-accent); }
+.seg.faireseg button { padding: 8px 4px; }
 button { background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 6px; }
 .app { max-width: 560px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 0 96px; }
@@ -308,7 +335,7 @@ const FREQS = [
   { d: 7, l: "Chaque semaine" }, { d: 14, l: "Toutes les 2 semaines" }, { d: 30, l: "Chaque mois" }
 ];
 const REPEATS = [["", "Jamais"], ["d1", "Chaque jour"], ["w1", "Chaque semaine"], ["w2", "Toutes les 2 semaines"], ["m1", "Chaque mois"], ["y1", "Chaque année"]];
-const FAIRESUBS = ["taches", "menage", "valise"];
+const FAIRESUBS = ["taches", "tca", "menage", "valise"];
 const DESTS = [{ id: "parents", e: "🏡", l: "Chez mes parents", s: "parents" }, { id: "josselin", e: "💕", l: "Chez Josselin", s: "Josselin" }];
 const PACKCATS = [{ id: "vet", e: "👕", l: "Vêtements" }, { id: "toil", e: "🧴", l: "Toilette & soins" }, { id: "tech", e: "🔌", l: "Tech" }, { id: "divers", e: "🎒", l: "Divers" }];
 const PACK_GUESS = [
@@ -323,7 +350,7 @@ const BASE_CHORES = [
   ["Salle de bain", 7], ["Toilettes", 7], ["Arroser les plantes", 7], ["Changer les draps", 14], ["Serpillère", 14],
   ["Poussière", 14], ["Trier le frigo", 14]
 ];
-const COLS = ["days", "meals", "recipes", "groceries", "todos", "chores", "books", "sessions", "sport", "journal", "packing", "meta"];
+const COLS = ["days", "meals", "recipes", "groceries", "todos", "chores", "books", "sessions", "sport", "journal", "packing", "pro", "meta"];
 const BUDGET_URL = "https://julianaboyenval-candidatures.github.io/mon-budget/";
 const SUBTABS = [["lecture", "📖 Lecture"], ["sport", "💪 Sport"], ["journal", "✍️ Journal"]];
 const SPORTS = [
@@ -369,7 +396,7 @@ const PLUS = svgI('<path d="M12 5v14M5 12h14"/>', 3);
 
 /* ---------- État et enregistrement (même file d'attente que Mon Budget) ---------- */
 const state = Object.assign(Object.fromEntries(COLS.map(c => [c, {}])), lsGet("vie.data", {}));
-const ui = { tab: lsGet("vie.tab", "jour"), moi: lsGet("vie.moi", "lecture"), week: mondayOf(today()), sweek: mondayOf(today()), faire: "taches", newDue: "none", packWhere: "both", rcal: today().slice(0, 7), rstat: "mois", gPrio: lsGet("vie.gprio", "moyen") };
+const ui = { tab: lsGet("vie.tab", "jour"), moi: lsGet("vie.moi", "lecture"), week: mondayOf(today()), sweek: mondayOf(today()), faire: "taches", newDue: "none", packWhere: "both", proDue: "none", proOpen: {}, proClient: "", rcal: today().slice(0, 7), rstat: "mois", gPrio: lsGet("vie.gprio", "moyen") };
 if (ui.tab === "lecture") { ui.tab = "moi"; ui.moi = "lecture"; }
 let db = null, mode = "loading", queue = lsGet("vie.q", []), flushing = false, stale = false;
 const confirmed = {};
@@ -524,6 +551,7 @@ function renderNotice() {
 function render() {
   const ae = document.activeElement;
   const keep = ae && ae.id && $("main").contains(ae) ? { id: ae.id, v: ae.value, s: ae.selectionStart } : null;
+  document.documentElement.toggleAttribute("data-pro", ui.tab === "faire" && ui.faire === "tca");
   renderHeader(); renderTabs(); renderNotice();
   $("main").innerHTML = VIEWS[ui.tab]();
   if (keep) { const el = $(keep.id); if (el) { el.value = keep.v; el.focus(); try { el.setSelectionRange(keep.s, keep.s); } catch (e) { /* type sans curseur */ } } }
@@ -555,6 +583,9 @@ function viewJour() {
   else out += '<div class="panel">' + shown.map(i => i.k === "meal" ? '<button class="item" data-act="meal" data-date="' + i.id.split("|")[0] + '" data-slot="' + i.id.split("|")[1] + '"><span class="emo">💡</span><div class="t"><div class="n">' + esc(i.n) + '</div><div class="d late">' + esc(i.sub) + '</div></div></button>' : '<div class="item">' + checkBtn(i.k === "todo" ? "todo-done" : i.k === "sport" ? "sp-done" : "chore-done", i.id, false, "Marquer « " + i.n + " » comme fait") + '<div class="t"><div class="n">' + esc(i.n) + '</div><div class="d">' + esc(i.sub) + '</div></div></div>').join("") + '</div>';
   if (doneToday) out += '<p class="small" style="margin:8px 4px 0">✓ ' + doneToday + ' chose' + (doneToday > 1 ? "s" : "") + ' déjà faite' + (doneToday > 1 ? "s" : "") + ' aujourd\'hui</p>';
   out += '</section>';
+
+  const proDue = list("pro").filter(t => !t.done && t.due && t.due <= d).sort((a, b) => (!!b.hot - !!a.hot) || a.due.localeCompare(b.due));
+  if (proDue.length) out += '<section><div class="panel"><button class="item" data-act="tab" data-id="tca"><span class="emo">💼</span><div class="t"><div class="n">TCA : ' + proDue.length + ' tâche' + (proDue.length > 1 ? "s" : "") + ' pour aujourd\'hui</div><div class="d' + (proDue.some(t => t.due < d) ? " late" : "") + '">' + esc(proDue.slice(0, 3).map(t => t.name + (proSubs(t).length ? " (" + (proSubs(t).length - proLeft(t)) + "/" + proSubs(t).length + ")" : "")).join(", ") + (proDue.length > 3 ? "…" : "")) + '</div></div></button></div></section>';
 
   /* Petites victoires */
   const wk = mondayOf(d);
@@ -656,8 +687,8 @@ const gItem = g => '<div class="item' + (g.done ? " faded" : "") + '">' + checkB
 
 /* À faire */
 function viewFaire() {
-  const out = '<div class="seg">' + [["taches", "Tâches"], ["menage", "Ménage"], ["valise", "🧳 À prendre"]].map(([k, l]) => '<button data-act="faire-seg" data-id="' + k + '" aria-pressed="' + (ui.faire === k) + '">' + l + '</button>').join("") + '</div>';
-  return out + (ui.faire === "menage" ? viewMenage() : ui.faire === "valise" ? viewValise() : viewTaches());
+  const out = '<div class="seg faireseg">' + [["taches", "Perso"], ["tca", "💼 TCA"], ["menage", "Ménage"], ["valise", "À prendre"]].map(([k, l]) => '<button data-act="faire-seg" data-id="' + k + '" aria-pressed="' + (ui.faire === k) + '">' + l + '</button>').join("") + '</div>';
+  return out + (ui.faire === "menage" ? viewMenage() : ui.faire === "valise" ? viewValise() : ui.faire === "tca" ? viewPro() : viewTaches());
 }
 function dueFor(k) {
   const d = today();
@@ -1042,6 +1073,122 @@ const ACTS_PACK = {
   "pack-del"(b) { save("packing", b.dataset.id, null); closeSheet(); },
   "pack-reset"() { const prev = packState().checked; savePackCfg({ checked: {} }); toast("Sac vidé, prêt pour le prochain départ", "Annuler", () => savePackCfg({ checked: prev })); },
   "pack-base"() { BASE_PACK.forEach(([name, cat], i) => save("packing", uid("pk"), { name, cat, where: "both", ts: Date.now() + i }, true)); render(); toast("Liste ajoutée : marque ce qui change entre tes parents et Josselin avec ⋯"); }
+};
+
+/* TCA (Trois C Agency) : tâches pro avec sous-tâches. Doc pro : {name, due, client, note, hot, subs:[{id, n, done}], done, doneAt, doneTs, ts} */
+const XS = svgI('<path d="M6 6l12 12M18 6L6 18"/>', 2.5);
+const proSubs = t => t.subs || [];
+const proLeft = t => proSubs(t).filter(x => !x.done).length;
+function viewPro() {
+  const d = today(), all = list("pro"), clients = [...new Set(all.filter(t => t.client).map(t => t.client))].sort((a, b) => a.localeCompare(b, "fr"));
+  if (ui.proClient && !clients.includes(ui.proClient)) ui.proClient = "";
+  const open = all.filter(t => !t.done && (!ui.proClient || t.client === ui.proClient));
+  const nToday = open.filter(t => t.due && t.due <= d).length;
+  const opts = [["none", "Sans date"], ["today", "Aujourd'hui"], ["tomorrow", "Demain"], ["week", "Cette semaine"]];
+  let out = '<section><div class="probanner"><span class="logo">TCA</span><div class="t"><b>Trois C Agency</b><span class="small">' +
+    esc(open.length ? open.length + " tâche" + (open.length > 1 ? "s" : "") + " en cours" + (nToday ? " · " + nToday + " pour aujourd'hui" : "") : "Rien en cours pour le moment") + '</span></div></div></section>';
+  out += '<section><div class="qadd"><input class="inp" id="proq" placeholder="Nouvelle tâche pro…" enterkeyhint="done" autocomplete="off" data-enter="pro-add"><button class="go" data-act="pro-add" aria-label="Ajouter la tâche">' + PLUS + '</button></div>' +
+    '<div class="chips" style="margin-top:8px">' + opts.map(([k, l]) => '<button class="chip" data-act="pro-due" data-id="' + k + '" aria-pressed="' + (ui.proDue === k) + '">' + l + '</button>').join("") + '</div></section>';
+  if (clients.length) out += '<section><div class="chips">' + [["", "Tout"], ...clients.map(c => [c, c])].map(([k, l]) => '<button class="chip" data-act="pro-client" data-id="' + esc(k) + '" aria-pressed="' + (ui.proClient === k) + '">' + esc(l) + '</button>').join("") + '</div></section>';
+  const groups = [
+    ["En retard", open.filter(t => t.due && t.due < d)],
+    ["Aujourd'hui", open.filter(t => t.due === d)],
+    ["Demain", open.filter(t => t.due === addDays(d, 1))],
+    ["Plus tard", open.filter(t => t.due && t.due > addDays(d, 1))],
+    ["Sans date", open.filter(t => !t.due)]
+  ];
+  if (!open.length) out += '<div class="panel"><div class="empty">Note ici tes tâches pour l\'agence. Touche une tâche pour la découper en petites étapes : c\'est plus doux quand on est fatiguée.</div></div>';
+  groups.forEach(([title, g]) => {
+    if (!g.length) return;
+    out += '<section><h2>' + title + '</h2><div class="panel">' + g.sort((a, b) => (!!b.hot - !!a.hot) || (a.due || "").localeCompare(b.due || "") || a.ts - b.ts).map(t => proItem(t, d)).join("") + '</div></section>';
+  });
+  const recent = all.filter(t => t.done && t.doneAt && diff(t.doneAt, d) <= 7 && (!ui.proClient || t.client === ui.proClient)).sort((a, b) => (b.doneTs || 0) - (a.doneTs || 0)).slice(0, 8);
+  if (recent.length) out += '<section><h2>Terminé cette semaine 🌱</h2><div class="panel">' + recent.map(t => proItem(t, d)).join("") + '</div></section>';
+  return out;
+}
+function proItem(t, d) {
+  const subs = proSubs(t), nd = subs.filter(x => x.done).length, isOpen = !!ui.proOpen[t.id] && !t.done;
+  const bits = [];
+  if (t.client) bits.push(t.client);
+  if (t.done) bits.push("Fait " + relPast(diff(t.doneAt, d)));
+  else if (t.due && t.due < d) bits.push("Prévu le " + dShort(t.due));
+  else if (t.due && t.due > addDays(d, 1)) bits.push(cap(fmt(t.due, { weekday: "long", day: "numeric", month: "short" })));
+  if (subs.length) bits.push(nd + "/" + subs.length + " étape" + (subs.length > 1 ? "s" : ""));
+  else if (!t.done) bits.push(isOpen ? "Ajoute des étapes ci-dessous" : "Touche pour ajouter des étapes");
+  let out = '<div class="protask"><div class="item' + (t.done ? " faded" : "") + '">' + checkBtn("pro-done", t.id, t.done, (t.done ? "Remettre en cours : " : "Terminer : ") + t.name) +
+    '<button class="t" data-act="pro-open" data-id="' + esc(t.id) + '" aria-expanded="' + isOpen + '"><div class="n">' + esc(t.name) + '</div><div class="d' + (!t.done && t.due && t.due < d ? " late" : "") + '">' + esc(bits.join(" · ")) + '</div></button>' +
+    (t.hot && !t.done ? '<span class="pill hot">prioritaire</span>' : '') +
+    '<button class="more" data-act="pro-edit" data-id="' + esc(t.id) + '" aria-label="Modifier ' + esc(t.name) + '">' + DOTS + '</button></div>';
+  if (subs.length && !t.done && !isOpen) out += '<div class="pbar"><i style="width:' + Math.round(nd / subs.length * 100) + '%"></i></div>';
+  if (isOpen) {
+    out += '<div class="subs">' + subs.map(x => '<div class="subitem' + (x.done ? " faded" : "") + '"><button class="check' + (x.done ? " on" : "") + '" data-act="pro-sub" data-id="' + esc(t.id) + '" data-sid="' + esc(x.id) + '" aria-pressed="' + !!x.done + '" aria-label="' + esc((x.done ? "Décocher : " : "Cocher : ") + x.n) + '">' + CHECK + '</button><span class="sn">' + esc(x.n) + '</span>' +
+      '<button class="x" data-act="pro-sub-del" data-id="' + esc(t.id) + '" data-sid="' + esc(x.id) + '" aria-label="Supprimer l\'étape ' + esc(x.n) + '">' + XS + '</button></div>').join("") +
+      '<div class="subadd"><input class="inp" id="ps-' + esc(t.id) + '" placeholder="Ajouter une étape…" enterkeyhint="done" autocomplete="off" data-enter="pro-sub-add" data-id="' + esc(t.id) + '"><button class="go" data-act="pro-sub-add" data-id="' + esc(t.id) + '" aria-label="Ajouter l\'étape">' + PLUS + '</button></div>' +
+      (t.note ? '<p class="small" style="margin:8px 0 0;white-space:pre-wrap">' + esc(t.note) + '</p>' : '') + '</div>';
+  }
+  return out + '</div>';
+}
+function sheetPro(id) {
+  const t = state.pro[id]; if (!t) return;
+  const clients = [...new Set(list("pro").filter(x => x.client).map(x => x.client))].sort((a, b) => a.localeCompare(b, "fr"));
+  openSheet("Tâche TCA",
+    '<label class="f">Tâche<input class="inp" id="prn" value="' + esc(t.name) + '" autocomplete="off"></label>' +
+    '<label class="f">Client ou projet (facultatif)<input class="inp" id="prc" value="' + esc(t.client || "") + '" placeholder="Ex : Envol, site vitrine…" autocomplete="off" list="prcl"></label>' +
+    '<datalist id="prcl">' + clients.map(c => '<option value="' + esc(c) + '">').join("") + '</datalist>' +
+    '<label class="f">Pour quand ? (facultatif)<input class="inp" type="date" id="prd" value="' + esc(t.due || "") + '"></label>' +
+    '<div>' + lab("Priorité") + segOf("prh", [["", "Normale"], ["1", "🔥 Prioritaire"]], t.hot ? "1" : "") + '</div>' +
+    '<label class="f">Notes<textarea class="inp" id="prnote" placeholder="Liens, infos, contacts…" style="min-height:80px">' + esc(t.note || "") + '</textarea></label>' +
+    '<label class="f">Étapes (une par ligne)<textarea class="inp" id="prs" style="min-height:100px" placeholder="Brief&#10;Maquette&#10;Envoi au client">' + esc(proSubs(t).map(x => x.n).join("\n")) + '</textarea></label>' +
+    '<button class="btn" data-act="pro-save" data-id="' + esc(id) + '">Enregistrer</button>' + delBtn("pro-del", id, "Supprimer la tâche"));
+}
+function proToggle(id) {
+  const t = state.pro[id]; if (!t) return;
+  if (t.done) { save("pro", id, { ...t, done: false, doneAt: null, doneTs: null }); return; }
+  const prev = { ...t };
+  save("pro", id, { ...t, done: true, doneAt: today(), doneTs: Date.now() });
+  toast("Tâche terminée 🌱", "Annuler", () => save("pro", id, prev));
+}
+const ACTS_PRO = {
+  "pro-due"(b) { ui.proDue = b.dataset.id; render(); },
+  "pro-client"(b) { ui.proClient = b.dataset.id; render(); },
+  "pro-add"() {
+    const el = $("proq"), v = el.value.trim(); el.value = "";
+    if (!v) return;
+    const d = today(), dow = P(d).getDay(), due = ui.proDue === "week" ? addDays(d, dow === 0 ? 0 : 5 - Math.min(dow, 5)) : dueFor(ui.proDue);
+    const id = uid("pr");
+    save("pro", id, { name: cap(v), due, client: ui.proClient || "", note: "", hot: false, subs: [], done: false, doneAt: null, ts: Date.now() }, true);
+    ui.proOpen = { [id]: true }; render();
+    const s = $("ps-" + id); if (s) s.focus();
+  },
+  "pro-open"(b) { const id = b.dataset.id; if (state.pro[id] && state.pro[id].done) return; ui.proOpen = ui.proOpen[id] ? {} : { [id]: true }; render(); },
+  "pro-done"(b) { proToggle(b.dataset.id); },
+  "pro-edit"(b) { sheetPro(b.dataset.id); },
+  "pro-sub"(b) {
+    const t = state.pro[b.dataset.id]; if (!t) return;
+    const subs = proSubs(t).map(x => x.id === b.dataset.sid ? { ...x, done: !x.done } : x);
+    save("pro", b.dataset.id, { ...t, subs });
+    if (subs.length && subs.every(x => x.done)) toast("Toutes les étapes sont faites ✨", "Terminer la tâche", () => proToggle(b.dataset.id));
+  },
+  "pro-sub-add"(b) {
+    const id = b.dataset.id, t = state.pro[id], el = $("ps-" + id); if (!t || !el) return;
+    const names = el.value.split(/[;\n]/).map(x => x.trim()).filter(Boolean); el.value = "";
+    if (names.length) save("pro", id, { ...t, subs: [...proSubs(t), ...names.map((n, i) => ({ id: uid("s") + i, n: cap(n), done: false }))] });
+    const s = $("ps-" + id); if (s) s.focus();
+  },
+  "pro-sub-del"(b) {
+    const id = b.dataset.id, t = state.pro[id]; if (!t) return;
+    const prev = { ...t };
+    save("pro", id, { ...t, subs: proSubs(t).filter(x => x.id !== b.dataset.sid) });
+    toast("Étape supprimée", "Annuler", () => save("pro", id, prev));
+  },
+  "pro-save"(b) {
+    const id = b.dataset.id, t = state.pro[id]; if (!t) return;
+    const old = proSubs(t), lines = $("prs").value.split("\n").map(x => x.trim()).filter(Boolean);
+    const subs = lines.map((n, i) => { const o = old.find(x => x.n === n); return o ? { ...o, n } : { id: uid("s") + i, n: cap(n), done: false }; });
+    save("pro", id, { ...t, name: $("prn").value.trim() || t.name, client: $("prc").value.trim(), due: $("prd").value || null, hot: picked("prh") === "1", note: $("prnote").value.trim(), subs });
+    closeSheet();
+  },
+  "pro-del"(b) { save("pro", b.dataset.id, null); closeSheet(); }
 };
 const VIEWS = { jour: viewJour, repas: viewRepas, courses: viewCourses, faire: viewFaire, moi: viewMoi };
 const ACTS_EXTRA = {};
@@ -1464,7 +1611,7 @@ const ACTS = {
     save("meta", "timer", null);
   }
 };
-Object.assign(ACTS, ACTS_EXTRA, ACTS_PACK);
+Object.assign(ACTS, ACTS_EXTRA, ACTS_PACK, ACTS_PRO);
 function rememberStaples(items, inc) {
   const cur = (state.meta.staples || {}).items || {}, next = { ...cur };
   items.forEach(g => { const k = norm(g.name); if (!k) return; const o = next[k] || { name: g.name, n: 0 }; next[k] = { name: o.name, rayon: g.rayon || o.rayon || "autre", n: (o.n || 0) + inc }; });
@@ -1491,7 +1638,7 @@ document.addEventListener("keydown", e => {
   if (e.key !== "Enter" || e.isComposing) return;
   const el = e.target.closest && e.target.closest("[data-enter]"); if (!el) return;
   e.preventDefault();
-  const act = el.dataset.enter, btn = document.querySelector('[data-act="' + act + '"][data-id], [data-act="' + act + '"]');
+  const act = el.dataset.enter, btn = el.dataset.id ? el : document.querySelector('[data-act="' + act + '"][data-id], [data-act="' + act + '"]');
   ACTS[act](btn || el);
 });
 

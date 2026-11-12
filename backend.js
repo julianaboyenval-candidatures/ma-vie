@@ -104,6 +104,7 @@
   /* Écran de connexion : le mot de passe n'est jamais gardé, seulement le jeton de session. */
   function showLogin() {
     if (loginPromise) return loginPromise;
+    document.documentElement.removeAttribute("data-pro");
     loginPromise = new Promise(resolve => {
       const box = document.createElement("div");
       box.className = "login";
